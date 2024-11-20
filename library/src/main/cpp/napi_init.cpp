@@ -1,53 +1,31 @@
 #include "napi/native_api.h"
 
-static napi_value Add(napi_env env, napi_callback_info info)
-{
-    size_t argc = 2;
-    napi_value args[2] = {nullptr};
+#include <napi.h>
 
-    napi_get_cb_info(env, info, &argc, args , nullptr, nullptr);
+Napi::Value Add(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
 
-    napi_valuetype valuetype0;
-    napi_typeof(env, args[0], &valuetype0);
+  if (info.Length() < 2) {
+    Napi::TypeError::New(env, "Wrong number of arguments")
+        .ThrowAsJavaScriptException();
+    return env.Null();
+  }
 
-    napi_valuetype valuetype1;
-    napi_typeof(env, args[1], &valuetype1);
+  if (!info[0].IsNumber() || !info[1].IsNumber()) {
+    Napi::TypeError::New(env, "Wrong arguments").ThrowAsJavaScriptException();
+    return env.Null();
+  }
 
-    double value0;
-    napi_get_value_double(env, args[0], &value0);
+  double arg0 = info[0].As<Napi::Number>().DoubleValue();
+  double arg1 = info[1].As<Napi::Number>().DoubleValue();
+  Napi::Number num = Napi::Number::New(env, arg0 + arg1 + 10);
 
-    double value1;
-    napi_get_value_double(env, args[1], &value1);
-
-    napi_value sum;
-    napi_create_double(env, value0 + value1, &sum);
-
-    return sum;
-
+  return num;
 }
 
-EXTERN_C_START
-static napi_value Init(napi_env env, napi_value exports)
-{
-    napi_property_descriptor desc[] = {
-        { "add", nullptr, Add, nullptr, nullptr, nullptr, napi_default, nullptr }
-    };
-    napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
-    return exports;
+Napi::Object Init(Napi::Env env, Napi::Object exports) {
+  exports.Set(Napi::String::New(env, "add"), Napi::Function::New(env, Add));
+  return exports;
 }
-EXTERN_C_END
 
-static napi_module demoModule = {
-    .nm_version = 1,
-    .nm_flags = 0,
-    .nm_filename = nullptr,
-    .nm_register_func = Init,
-    .nm_modname = "library",
-    .nm_priv = ((void*)0),
-    .reserved = { 0 },
-};
-
-extern "C" __attribute__((constructor)) void RegisterLibraryModule(void)
-{
-    napi_module_register(&demoModule);
-}
+NODE_API_MODULE(library, Init)
