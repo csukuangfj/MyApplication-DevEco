@@ -2156,7 +2156,8 @@ inline ArrayBuffer::ArrayBuffer(napi_env env, napi_value value)
 
 inline void* ArrayBuffer::Data() {
   void* data;
-  napi_status status = napi_get_arraybuffer_info(_env, _value, &data, nullptr);
+  size_t byte_length;
+  napi_status status = napi_get_arraybuffer_info(_env, _value, &data, &byte_length);
   NAPI_THROW_IF_FAILED(_env, status, nullptr);
   return data;
 }
