@@ -1,5 +1,5 @@
 import hilog from '@ohos.hilog';
-import testNapi from 'liblibrary.so';
+//import {add} from 'liblibrary.so';
 
 @Component
 export struct MainPage {
@@ -12,7 +12,7 @@ export struct MainPage {
           .fontSize(50)
           .fontWeight(FontWeight.Bold)
           .onClick(() => {
-            hilog.info(0x0000, 'testTag', 'Test NAPI 2 + 3 = %{public}d', testNapi.add(2, 3));
+            // hilog.info(0x0000, 'testTag', 'Test NAPI 2 + 3 = %{public}d', add(2, 3));
           })
       }
       .width('100%')

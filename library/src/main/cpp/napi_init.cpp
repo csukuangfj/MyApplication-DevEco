@@ -2,6 +2,7 @@
 
 #include <napi.h>
 
+
 Napi::Value Add(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
 
@@ -24,10 +25,12 @@ Napi::Value Add(const Napi::CallbackInfo& info) {
 }
 
 void InitWaveReader(Napi::Env env, Napi::Object exports);
+void InitVad(Napi::Env env, Napi::Object exports);
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
   exports.Set(Napi::String::New(env, "add"), Napi::Function::New(env, Add));
   InitWaveReader(env, exports);
+    InitVad(env, exports);
   return exports;
 }
 
