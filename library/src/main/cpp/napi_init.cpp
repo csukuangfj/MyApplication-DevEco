@@ -26,11 +26,15 @@ Napi::Value Add(const Napi::CallbackInfo& info) {
 
 void InitWaveReader(Napi::Env env, Napi::Object exports);
 void InitVad(Napi::Env env, Napi::Object exports);
+void InitNonStreamingAsr(Napi::Env env, Napi::Object exports);
+void InitStreamingAsr(Napi::Env env, Napi::Object exports);
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
   exports.Set(Napi::String::New(env, "add"), Napi::Function::New(env, Add));
   InitWaveReader(env, exports);
-    InitVad(env, exports);
+  InitVad(env, exports);
+    InitNonStreamingAsr(env, exports);
+    InitStreamingAsr(env, exports);
   return exports;
 }
 

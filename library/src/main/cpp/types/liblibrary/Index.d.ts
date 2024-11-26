@@ -19,3 +19,9 @@ export const voiceActivityDetectorClear: (handle: number) => void;
 export const voiceActivityDetectorFront: (handle: number, enableExternalBuffer: boolean = true) => {samples: Float32Array, start: number};
 export const voiceActivityDetectorReset: (handle: number) => void;
 export const voiceActivityDetectorFlush: (handle: number) => void;
+
+export const createOfflineRecognizer: (config: object, mgr?: object) => number;
+export const createOfflineStream: (handle: number) => number;
+export const acceptWaveformOffline: (handle: number, audio: object) => void;
+export const decodeOfflineStream: (handle: number, streamHandle: number) => void;
+export const getOfflineStreamResultAsJson: (streamHandle: number) => string;

@@ -3,6 +3,8 @@ import {add, readWave, readRawFile,
   SileroVadConfig,
   CircularBuffer,
   Vad,
+  OfflineRecognizerConfig,
+  OfflineRecognizer,
 } from "library";
 import {fileIo} from '@kit.CoreFileKit';
 import { buffer } from '@kit.ArkTS';
@@ -46,7 +48,6 @@ struct Index {
 
     const bufferSizeInSeconds = 60;
     const vad = new Vad(config, bufferSizeInSeconds, mgr);
-    this.copyRawFileToSandbox('0.wav', '0.wav');
 
     let sandboxPath: string = getContext().getApplicationContext().filesDir;
     let filepath = sandboxPath + "/0.wav";
@@ -112,6 +113,33 @@ struct Index {
     console.log(`buffer head: ${buffer.head()}`);
   }
 
+  testNonStreamingAsr() {
+    let mgr = getContext().resourceManager;
+    const config = new OfflineRecognizerConfig();
+    config.modelConfig.whisper.encoder = "sherpa-onnx-whisper-tiny.en/tiny.en-encoder.int8.onnx";
+    config.modelConfig.whisper.decoder = "sherpa-onnx-whisper-tiny.en/tiny.en-decoder.int8.onnx";
+    config.modelConfig.tokens = "sherpa-onnx-whisper-tiny.en/tiny.en-tokens.txt";
+    config.modelConfig.debug = true;
+    const recognizer = new OfflineRecognizer(config, mgr)
+
+    const sandboxPath: string = getContext().getApplicationContext().filesDir;
+    const filepath = sandboxPath + "/en.wav";
+    const wave = readWave(filepath, false);
+    console.log(`sample rate ${wave.sampleRate}`);
+    console.log(`samples length ${wave.samples.length}`);
+
+    console.log('creating stream');
+    const stream = recognizer.createStream();
+    console.log('accept waveform');
+    stream.acceptWaveform({samples: wave.samples, sampleRate: wave.sampleRate});
+    console.log('decode');
+    recognizer.decode(stream);
+    console.log('get result');
+    const result = recognizer.getResult(stream);
+    console.log(`result is ${result.json}`);
+
+  }
+
   build() {
     Row() {
       Column() {
@@ -120,8 +148,12 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .onClick(()=>{
 
-            this.testVad();
-            this.testCircularBuffer();
+            this.copyRawFileToSandbox('0.wav', '0.wav');
+            this.copyRawFileToSandbox('en.wav', 'en.wav');
+
+            this.testNonStreamingAsr();
+            // this.testVad();
+            // this.testCircularBuffer();
           })
       }
       .width('100%')

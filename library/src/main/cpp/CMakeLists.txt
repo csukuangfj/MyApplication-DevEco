@@ -15,6 +15,8 @@ include_directories(${NATIVERENDER_ROOT_PATH}
 add_library(library SHARED napi_init.cpp
 wave-reader.cc
 vad.cc
+non-streaming-asr.cc
+streaming-asr.cc
 )
 
 add_library(sherpa_onnx_c_api SHARED IMPORTED)

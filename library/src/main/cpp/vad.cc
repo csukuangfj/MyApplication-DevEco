@@ -9,7 +9,7 @@
 #include "macros.h"  // NOLINT
 #include "napi.h"    // NOLINT
 #include "sherpa-onnx/c-api/c-api.h"
-#include <rawfile/raw_file_manager.h>
+#include "rawfile/raw_file_manager.h"
 
 #include "hilog/log.h"
 
