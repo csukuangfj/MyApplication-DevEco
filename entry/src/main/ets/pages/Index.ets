@@ -5,11 +5,18 @@ import {add, readWave, readRawFile,
   Vad,
   OfflineRecognizerConfig,
   OfflineRecognizer,
+  OnlineRecognizerConfig,
+  OnlineRecognizer,
 } from "library";
 import {fileIo} from '@kit.CoreFileKit';
 import { buffer } from '@kit.ArkTS';
 import File from '@system.file';
 
+import worker from '@ohos.worker';
+
+let workerInstance: worker.ThreadWorker = new worker.ThreadWorker('entry/ets/workers/StreamingAsrWorker.ets', {
+  name: 'Streaming ASR Worker'
+});
 
 
 @Entry
@@ -137,6 +144,15 @@ struct Index {
     console.log('get result');
     const result = recognizer.getResult(stream);
     console.log(`result is ${result.json}`);
+  }
+
+  testStreamingAsr() {
+    let mgr = getContext().resourceManager;
+    let context = getContext()
+    const sandboxPath: string = getContext().getApplicationContext().filesDir;
+    console.log(`here sandboxpath: ${sandboxPath}`);
+    workerInstance.postMessage({msg: 'start', mgr, sandboxPath, context});
+    return
 
   }
 
@@ -150,8 +166,11 @@ struct Index {
 
             this.copyRawFileToSandbox('0.wav', '0.wav');
             this.copyRawFileToSandbox('en.wav', 'en.wav');
+            this.copyRawFileToSandbox('zh.wav', 'zh.wav');
 
-            this.testNonStreamingAsr();
+
+            this.testStreamingAsr();
+            // this.testNonStreamingAsr();
             // this.testVad();
             // this.testCircularBuffer();
           })

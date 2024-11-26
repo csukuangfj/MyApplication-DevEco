@@ -25,3 +25,13 @@ export const createOfflineStream: (handle: number) => number;
 export const acceptWaveformOffline: (handle: number, audio: object) => void;
 export const decodeOfflineStream: (handle: number, streamHandle: number) => void;
 export const getOfflineStreamResultAsJson: (streamHandle: number) => string;
+
+export const createOnlineRecognizer: (config: object, mgr?: object) => number;
+export const createOnlineStream: (handle: number) => number;
+export const acceptWaveformOnline: (handle: number, audio: object) => void;
+export const inputFinished: (streamHandle: number) => void;
+export const isOnlineStreamReady: (handle: number, streamHandle: number) => boolean;
+export const decodeOnlineStream: (handle: number, streamHandle: number) => void;
+export const isEndpoint: (handle: number, streamHandle: number) => boolean;
+export const reset: (handle: number, streamHandle: number) => void;
+export const getOnlineStreamResultAsJson: (handle: number, streamHandle: number) => string;

@@ -5,7 +5,17 @@
 
 #include "macros.h"  // NOLINT
 #include "napi.h"    // NOLINT
+#include "rawfile/raw_file_manager.h"
 #include "sherpa-onnx/c-api/c-api.h"
+
+#include "hilog/log.h"
+
+#undef LOG_DOMAIN 
+#undef LOG_TAG 
+
+// https://gitee.com/openharmony/docs/blob/145a084f0b742e4325915e32f8184817927d1251/en/contribute/OpenHarmony-Log-guide.md#hilog-api-usage-specifications
+#define LOG_DOMAIN 0x6666
+#define LOG_TAG "sherpa_onnx" 
 /*
 {
   'featConfig': {
@@ -147,9 +157,9 @@ static SherpaOnnxOnlineCtcFstDecoderConfig GetCtcFstDecoderConfig(
 static Napi::External<SherpaOnnxOnlineRecognizer> CreateOnlineRecognizerWrapper(
     const Napi::CallbackInfo &info) {
   Napi::Env env = info.Env();
-  if (info.Length() != 1) {
+  if (info.Length() != 2) {
     std::ostringstream os;
-    os << "Expect only 1 argument. Given: " << info.Length();
+    os << "Expect only 2 arguments. Given: " << info.Length();
 
     Napi::TypeError::New(env, os.str()).ThrowAsJavaScriptException();
 
@@ -199,8 +209,10 @@ static Napi::External<SherpaOnnxOnlineRecognizer> CreateOnlineRecognizerWrapper(
 
   c.ctc_fst_decoder_config = GetCtcFstDecoderConfig(o);
 
+  std::unique_ptr<NativeResourceManager, decltype(&OH_ResourceManager_ReleaseNativeResourceManager)> mgr (OH_ResourceManager_InitNativeResourceManager(env, info[1]), &OH_ResourceManager_ReleaseNativeResourceManager);
+    
   const SherpaOnnxOnlineRecognizer *recognizer =
-      SherpaOnnxCreateOnlineRecognizer(&c);
+      SherpaOnnxCreateOnlineRecognizerOHOS(&c, mgr.get());
 
   if (c.model_config.transducer.encoder) {
     delete[] c.model_config.transducer.encoder;
@@ -384,9 +396,12 @@ static void AcceptWaveformWrapper(const Napi::CallbackInfo &info) {
 
   Napi::Float32Array samples = obj.Get("samples").As<Napi::Float32Array>();
   int32_t sample_rate = obj.Get("sampleRate").As<Napi::Number>().Int32Value();
+    
+  int32_t num_samples =   samples.ElementLength() / sizeof(float);
+  OH_LOG_INFO(LOG_APP, "number of samples: %{public}d", num_samples);
 
   SherpaOnnxOnlineStreamAcceptWaveform(stream, sample_rate, samples.Data(),
-                                       samples.ElementLength());
+                                       num_samples);
 }
 
 static Napi::Boolean IsOnlineStreamReadyWrapper(
