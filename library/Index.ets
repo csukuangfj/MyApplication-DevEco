@@ -32,7 +32,7 @@ import {
   voiceActivityDetectorReset,
 } from "liblibrary.so";
 export { MainPage } from './src/main/ets/components/MainPage';
-export {add, readWave, readRawFile} from "liblibrary.so";
+export {add, readWave, readRawFile, readWaveFromBinary} from "liblibrary.so";
 
 
 export class SileroVadConfig {
@@ -65,7 +65,7 @@ export class VadConfig {
   }
 }
 export class CircularBuffer {
-  private handle: number;
+  private handle: object;
   constructor(capacity: number) {
     this.handle = createCircularBuffer(capacity);
   }
@@ -105,11 +105,12 @@ export interface SpeechSegment {
 }
 
 export class Vad {
-  private handle: number;
+  private handle: object;
   public config: VadConfig;
-  constructor(config: VadConfig, bufferSizeInSeconds: number, mgr?: object) {
+
+  constructor(config: VadConfig, bufferSizeInSeconds?: number, mgr?: object) {
     this.handle =
-      createVoiceActivityDetector(config, bufferSizeInSeconds, mgr);
+        createVoiceActivityDetector(config, bufferSizeInSeconds, mgr);
     this.config = config;
   }
 
@@ -152,8 +153,8 @@ export interface Samples {
 }
 
 export class OfflineStream {
-  public handle: number;
-  constructor(handle: number) {
+  public handle: object;
+  constructor(handle: object) {
     this.handle = handle;
   }
 
@@ -270,10 +271,10 @@ interface OfflineRecognizerResultJson {
 }
 
 export class OfflineRecognizer {
-  public handle: number;
-  public config: OfflineRecognizerConfig
+  public handle: object;
+  public config: OfflineRecognizerConfig;
 
-  constructor(config: OfflineRecognizerConfig, mgr: object) {
+  constructor(config: OfflineRecognizerConfig , mgr?: object) {
     this.handle = createOfflineRecognizer(config, mgr);
     this.config = config
   }
@@ -305,9 +306,9 @@ export class OfflineRecognizer {
   }
 }
 
-class OnlineStream {
-  public handle: number;
-  constructor(handle: number) {
+export class OnlineStream {
+  public handle: object;
+  constructor(handle: object) {
     this.handle = handle;
   }
 
@@ -396,7 +397,7 @@ export class OnlineRecognizerResult {
 };
 
 export class OnlineRecognizer {
-  public handle: number;
+  public handle: object;
   public config: OnlineRecognizerConfig
   constructor(config: OnlineRecognizerConfig, mgr?: object) {
     this.handle = createOnlineRecognizer(config, mgr);

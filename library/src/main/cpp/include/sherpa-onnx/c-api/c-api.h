@@ -1003,6 +1003,17 @@ SHERPA_ONNX_API const SherpaOnnxWave *SherpaOnnxReadWave(const char *filename);
 
 SHERPA_ONNX_API void SherpaOnnxFreeWave(const SherpaOnnxWave *wave);
 
+// Return a NULL pointer on error. It supports only standard WAVE file.
+// Each sample should be 16-bit. It supports only single channel..
+//
+// Similar to SherpaOnnxReadWave(), it assumes you have read all of the data
+// from the wave file and saved it to the array `data`.
+//
+// If the returned pointer is not NULL, the user has to invoke
+// SherpaOnnxFreeWave() to free the returned pointer to avoid memory leak.
+SHERPA_ONNX_API const SherpaOnnxWave *SherpaOnnxReadWaveFromBinaryData(
+    const char *data, int32_t n);
+
 // ============================================================
 // For spoken language identification
 // ============================================================

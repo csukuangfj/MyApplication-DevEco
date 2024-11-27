@@ -388,7 +388,6 @@ static void AcceptWaveformOfflineWrapper(const Napi::CallbackInfo &info) {
   // Note(fangun): For unknown reasons on HarmonyOS, we need to divide it by
     // sizeof(float) here
   int32_t num_samples =   samples.ElementLength() / sizeof(float);
-  OH_LOG_INFO(LOG_APP, "number of samples: %{public}d", num_samples);
   SherpaOnnxAcceptWaveformOffline(stream, sample_rate, samples.Data(),
                                   num_samples);
 }

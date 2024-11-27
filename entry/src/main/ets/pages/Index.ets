@@ -1,28 +1,113 @@
-import {add, readWave, readRawFile,
+import {
+  readWave,
   VadConfig,
   SileroVadConfig,
-  CircularBuffer,
   Vad,
-  OfflineRecognizerConfig,
-  OfflineRecognizer,
-  OnlineRecognizerConfig,
-  OnlineRecognizer,
 } from "library";
-import {fileIo} from '@kit.CoreFileKit';
+
+import audio from '@ohos.multimedia.audio';
+import { fileIo } from '@kit.CoreFileKit';
 import { buffer } from '@kit.ArkTS';
-import File from '@system.file';
+import { picker } from '@kit.CoreFileKit';
+import { BusinessError } from '@kit.BasicServicesKit';
 
-import worker from '@ohos.worker';
-
-let workerInstance: worker.ThreadWorker = new worker.ThreadWorker('entry/ets/workers/StreamingAsrWorker.ets', {
-  name: 'Streaming ASR Worker'
-});
+import worker, { MessageEvents } from '@ohos.worker';
+import { LengthUnit } from '@kit.ArkUI';
 
 
 @Entry
 @Component
 struct Index {
-  @State message: string = 'Hello World';
+  @State currentIndex: number = 0;
+  private controller: TabsController = new TabsController()
+  private workerInstance?: worker.ThreadWorker
+  private readonly scriptURL: string = 'entry/ets/workers/NonStreamingAsrWithVadWorker.ets'
+  @State message: string = 'To be implemented';
+  @State resultFromFile: string = '';
+  @State progressForFile: number = 0;
+
+  @State selectFileBtnEnabled: boolean = false;
+
+  // microphone related
+  private audioCapturer?: audio.AudioCapturer;
+
+  initMicrophone() {
+    const audioStreamInfo: audio.AudioStreamInfo = {
+      // Please don't change the sample rate unless you know what you are doing.
+      samplingRate: audio.AudioSamplingRate.SAMPLE_RATE_16000,
+
+      // We support only a single channel
+      channels: audio.AudioChannel.CHANNEL_1,
+
+      // each sample should be normalized to the range [-1, 1]
+      sampleFormat: audio.AudioSampleFormat.SAMPLE_FORMAT_F32LE,
+      encodingType: audio.AudioEncodingType.ENCODING_TYPE_RAW,
+    };
+
+    const audioCapturerInfo: audio.AudioCapturerInfo = {
+      source: audio.SourceType.SOURCE_TYPE_MIC,
+      capturerFlags: 0,
+    };
+
+    const audioCapturerOptions: audio.AudioCapturerOptions = {
+      streamInfo: audioStreamInfo,
+      capturerInfo: audioCapturerInfo,
+    };
+
+    audio.createAudioCapturer(audioCapturerOptions, (err, capturer) => {
+      if (err) {
+        console.error(`Invoke createAudioCapturer failed, code is ${err.code}, message is ${err.message}`);
+        return;
+      }
+      console.log(`audio capturer created!`);
+      this.audioCapturer = capturer;
+    })
+  }
+
+  aboutToAppear(): void {
+    this.workerInstance = new worker.ThreadWorker(this.scriptURL, {
+      name: 'NonStreaming ASR worker'
+    });
+
+    this.workerInstance.onmessage = (e: MessageEvents) => {
+      const msgType = e.data['msgType'] as string;
+      console.log(`received data ${msgType}`);
+
+      if (msgType == 'init-non-streaming-asr-done') {
+        this.selectFileBtnEnabled = true;
+      }
+
+      if (msgType == 'non-streaming-asr-vad-decode-done') {
+        this.resultFromFile = e.data['text'] as string + '\n';
+      }
+
+      if (msgType == 'non-streaming-asr-vad-decode-partial') {
+        if (this.resultFromFile == '') {
+          this.resultFromFile = e.data['text'] as string;
+        } else {
+          this.resultFromFile += '\n\n' + e.data['text'] as string;
+        }
+      }
+
+      if (msgType == 'non-streaming-asr-vad-decode-error') {
+        this.resultFromFile = e.data['text'] as string;
+      }
+
+      if (msgType == 'non-streaming-asr-vad-decode-progress') {
+        this.progressForFile = e.data['progress'] as number;
+
+        this.selectFileBtnEnabled = this.progressForFile >= 100;
+      }
+    }
+
+    const context = getContext();
+    this.workerInstance.postMessage({ msgType: 'init-vad', context });
+    this.workerInstance.postMessage({ msgType: 'init-non-streaming-asr', context });
+
+    this.workerInstance.postMessage({ msgType: 'init-vad-mic', context });
+
+    this.initMicrophone();
+  }
 
   copyRawFileToSandbox(src: string, dst: string) {
     // see https://blog.csdn.net/weixin_44640245/article/details/142634846
@@ -62,7 +147,7 @@ struct Index {
     console.log(`sample rate ${wave.sampleRate}`);
     console.log(`samples length ${wave.samples.length}`);
     const windowSize = vad.config.sileroVad.windowSize;
-    for (let i = 0; i < wave.samples.length; i+= windowSize) {
+    for (let i = 0; i < wave.samples.length; i += windowSize) {
       const thisWindow = wave.samples.subarray(i, i + windowSize)
       vad.acceptWaveform(thisWindow);
       while (!vad.isEmpty()) {
@@ -79,104 +164,145 @@ struct Index {
     }
   }
 
-  testCircularBuffer() {
-    const buffer = new CircularBuffer(5);
-    console.log(`buffer size: ${buffer.size()}`);
-    console.log(`buffer head: ${buffer.head()}`);
-    buffer.push(Float32Array.from([0, 10, 20]));
-    console.log(`buffer size: ${buffer.size()}`);
-    console.log(`buffer head: ${buffer.head()}`);
-    console.log(`buffer get: ${buffer.get(0, 1)}`);
-    console.log(`buffer get: ${buffer.get(0, 2)}`);
-    buffer.push(Float32Array.from([30, 40, 50, 60]));
-    console.log(`buffer size: ${buffer.size()}`);
-    console.log(`buffer head: ${buffer.head()}`);
-    buffer.pop(4);
-    console.log(`buffer get: ${buffer.get(buffer.head(), 2)}`);
-    buffer.pop(1);
-    console.log(`buffer size: ${buffer.size()}`);
-    console.log(`buffer head: ${buffer.head()}`);
-    console.log(`buffer get: ${buffer.get(buffer.head(), 2)}`);
-    buffer.pop(2);
-    buffer.push(Float32Array.from([100, 200, 300, 400, 500]));
-    console.log(`buffer size: ${buffer.size()}`);
-    console.log(`buffer head: ${buffer.head()}`);
-
-    buffer.pop(4);
-    console.log(`buffer size: ${buffer.size()}`);
-    console.log(`buffer head: ${buffer.head()}`);
-
-    buffer.push(Float32Array.from([600, 700]));
-    console.log(`buffer size: ${buffer.size()}`);
-    console.log(`buffer head: ${buffer.head()}`);
-    console.log(`buffer get: ${buffer.get(buffer.head(), 3)}`);
-
-    buffer.pop(3);
-    console.log(`buffer size: ${buffer.size()}`);
-    console.log(`buffer head: ${buffer.head()}`);
-
-    buffer.reset();
-    console.log(`buffer size: ${buffer.size()}`);
-    console.log(`buffer head: ${buffer.head()}`);
+  onPageShow(): void {
+    console.log('on page show is called');
   }
 
-  testNonStreamingAsr() {
-    let mgr = getContext().resourceManager;
-    const config = new OfflineRecognizerConfig();
-    config.modelConfig.whisper.encoder = "sherpa-onnx-whisper-tiny.en/tiny.en-encoder.int8.onnx";
-    config.modelConfig.whisper.decoder = "sherpa-onnx-whisper-tiny.en/tiny.en-decoder.int8.onnx";
-    config.modelConfig.tokens = "sherpa-onnx-whisper-tiny.en/tiny.en-tokens.txt";
-    config.modelConfig.debug = true;
-    const recognizer = new OfflineRecognizer(config, mgr)
-
-    const sandboxPath: string = getContext().getApplicationContext().filesDir;
-    const filepath = sandboxPath + "/en.wav";
-    const wave = readWave(filepath, false);
-    console.log(`sample rate ${wave.sampleRate}`);
-    console.log(`samples length ${wave.samples.length}`);
-
-    console.log('creating stream');
-    const stream = recognizer.createStream();
-    console.log('accept waveform');
-    stream.acceptWaveform({samples: wave.samples, sampleRate: wave.sampleRate});
-    console.log('decode');
-    recognizer.decode(stream);
-    console.log('get result');
-    const result = recognizer.getResult(stream);
-    console.log(`result is ${result.json}`);
+  onPageHide(): void {
+    console.log('on page hide is called');
   }
 
-  testStreamingAsr() {
-    let mgr = getContext().resourceManager;
-    let context = getContext()
-    const sandboxPath: string = getContext().getApplicationContext().filesDir;
-    console.log(`here sandboxpath: ${sandboxPath}`);
-    workerInstance.postMessage({msg: 'start', mgr, sandboxPath, context});
-    return
+  onBackPress(): boolean | void {
+    console.log('on back press is called');
+  }
 
+  @Builder
+  TabBuilder(title: string, targetIndex: number, selectedImg: Resource, normalImg: Resource) {
+    Column() {
+      Image(this.currentIndex == targetIndex ? selectedImg : normalImg)
+        .size({ width: 25, height: 25 })
+      Text(title)
+        .fontColor(this.currentIndex == targetIndex ? '#28bff1' : '#8a8a8a')
+    }
+    .width('100%')
+    .height(50)
+    .justifyContent(FlexAlign.Center)
+    .onClick(() => {
+      this.currentIndex = targetIndex;
+      this.controller.changeIndex(this.currentIndex);
+    })
   }
 
   build() {
-    Row() {
-      Column() {
-        Text(this.message)
-          .fontSize(50)
-          .fontWeight(FontWeight.Bold)
-          .onClick(()=>{
+    Column() {
+      Tabs({ barPosition: BarPosition.End, controller: this.controller }) {
+        TabContent() {
+          Column({space: 10}) {
+            Text('Next-gen Kaldi: VAD + ASR')
+              .fontColor('#182431')
+              .fontSize(25)
+              .lineHeight(41)
+              .fontWeight(500)
 
-            this.copyRawFileToSandbox('0.wav', '0.wav');
-            this.copyRawFileToSandbox('en.wav', 'en.wav');
-            this.copyRawFileToSandbox('zh.wav', 'zh.wav');
+            Button('Select .wav 文件 (英文识别) ')
+              .enabled(this.selectFileBtnEnabled)
+              .fontSize(13)
+              .width(296)
+              .height(60)
+              .onClick(() => {
+                this.resultFromFile = '';
+                this.progressForFile = 0;
 
+                const documentSelectOptions = new picker.DocumentSelectOptions();
+                documentSelectOptions.maxSelectNumber = 1;
+                documentSelectOptions.fileSuffixFilters = ['.wav'];
+                const documentViewPicker = new picker.DocumentViewPicker();
+                documentViewPicker.select(documentSelectOptions).then((result: Array<string>) => {
+                  console.log(`Result: ${result}`);
 
-            this.testStreamingAsr();
-            // this.testNonStreamingAsr();
-            // this.testVad();
-            // this.testCircularBuffer();
-          })
-      }
-      .width('100%')
+                  if (!result[0]) {
+                    this.resultFromFile = 'Please select a file to decode';
+                    this.selectFileBtnEnabled = true;
+                    return;
+                  }
+
+                  if (this.workerInstance) {
+                    this.workerInstance.postMessage({
+                      msgType: 'non-streaming-asr-vad-decode',
+                      filename: result[0],
+                    });
+                  } else {
+                    console.log(`this worker instance is undefined ${this.workerInstance}`);
+                  }
+                }).catch((err: BusinessError) => {
+                  console.error(`Failed to select file, code is ${err.code}, message is ${err.message}`);
+                })
+              })
+
+            if (this.progressForFile > 0) {
+              Row() {
+                Progress({ value: 0, total: 100, type: ProgressType.Capsule })
+                  .width('80%')
+                  .height(20)
+                  .value(this.progressForFile);
+
+                  Text(`${this.progressForFile.toFixed(2)}%`).width('15%')
+              }.width('100%').justifyContent(FlexAlign.Center)
+            }
+
+            TextArea({text: this.resultFromFile}).width('100%').lineSpacing({value: 10, unit: LengthUnit.VP});
+          }
+          .alignItems(HorizontalAlign.Center)
+          .justifyContent(FlexAlign.Start)
+        }.tabBar(this.TabBuilder('From file', 0, $r('app.media.icon_doc'), $r('app.media.icon_doc_default')))
+
+        TabContent() {
+          Column() {
+            Text(this.message)
+              .fontSize(50)
+              .fontWeight(FontWeight.Bold)
+              .onClick(() => {
+
+                // this.copyRawFileToSandbox('0.wav', '0.wav');
+                // this.copyRawFileToSandbox('en.wav', 'en.wav');
+                // this.copyRawFileToSandbox('Obama.wav', 'Obama.wav');
+/*
+                if (this.workerInstance) {
+                  const sandboxPath: string = getContext().getApplicationContext().filesDir;
+                  const filename = sandboxPath + `/en.wav`;
+                  this.workerInstance.postMessage({
+                    msgType: 'non-streaming-asr-vad-decode',
+                    filename: filename,
+                  });
+                }
+*/
+
+                // this.testStreamingAsr();
+                // this.testNonStreamingAsr();
+                // this.testVad();
+                // this.testCircularBuffer();
+              })
+          }
+        }
+        .tabBar(this.TabBuilder('From mic', 1, $r('app.media.ic_public_input_voice'),
+          $r('app.media.ic_public_input_voice_default')))
+
+        TabContent() {
+          Column() {
+            Text("Everything is open-sourced");
+            Divider();
+            Text("It runs locally, without accessing the network");
+            Divider();
+            Text("See also https://github.com/k2-fsa/sherpa-onnx");
+            Divider();
+            Text("and https://k2-fsa.github.io/sherpa/social-groups.html");
+          }
+        }
+        .tabBar(this.TabBuilder('Help', 2, $r('app.media.info_circle'),
+          $r('app.media.info_circle_default')))
+      }.scrollable(false)
     }
-    .height('100%')
+    .width('100%')
+    .justifyContent(FlexAlign.Start)
   }
 }
