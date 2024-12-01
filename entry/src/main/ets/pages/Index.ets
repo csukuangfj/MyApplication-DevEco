@@ -2,14 +2,18 @@ import {
   readWave,
   VadConfig,
   SileroVadConfig,
-  Vad,
+  Vad, listRawfileDir,
 } from "library";
 
+import abilityAccessCtrl, { Permissions } from '@ohos.abilityAccessCtrl';
+
 import audio from '@ohos.multimedia.audio';
-import { fileIo } from '@kit.CoreFileKit';
-import { buffer } from '@kit.ArkTS';
+import { fileIo as fs } from '@kit.CoreFileKit';
+import { buffer, List } from '@kit.ArkTS';
 import { picker } from '@kit.CoreFileKit';
 import { BusinessError } from '@kit.BasicServicesKit';
+
+
 
 import worker, { MessageEvents } from '@ohos.worker';
 import { LengthUnit } from '@kit.ArkUI';
@@ -28,43 +32,8 @@ struct Index {
 
   @State selectFileBtnEnabled: boolean = false;
 
-  // microphone related
-  private audioCapturer?: audio.AudioCapturer;
 
-  initMicrophone() {
-    const audioStreamInfo: audio.AudioStreamInfo = {
-      // Please don't change the sample rate unless you know what you are doing.
-      samplingRate: audio.AudioSamplingRate.SAMPLE_RATE_16000,
-
-      // We support only a single channel
-      channels: audio.AudioChannel.CHANNEL_1,
-
-      // each sample should be normalized to the range [-1, 1]
-      sampleFormat: audio.AudioSampleFormat.SAMPLE_FORMAT_F32LE,
-      encodingType: audio.AudioEncodingType.ENCODING_TYPE_RAW,
-    };
-
-    const audioCapturerInfo: audio.AudioCapturerInfo = {
-      source: audio.SourceType.SOURCE_TYPE_MIC,
-      capturerFlags: 0,
-    };
-
-    const audioCapturerOptions: audio.AudioCapturerOptions = {
-      streamInfo: audioStreamInfo,
-      capturerInfo: audioCapturerInfo,
-    };
-
-    audio.createAudioCapturer(audioCapturerOptions, (err, capturer) => {
-      if (err) {
-        console.error(`Invoke createAudioCapturer failed, code is ${err.code}, message is ${err.message}`);
-        return;
-      }
-      console.log(`audio capturer created!`);
-      this.audioCapturer = capturer;
-    })
-  }
-
-  aboutToAppear(): void {
+  aboutToAppear() {
     this.workerInstance = new worker.ThreadWorker(this.scriptURL, {
       name: 'NonStreaming ASR worker'
     });
@@ -105,21 +74,75 @@ struct Index {
     this.workerInstance.postMessage({ msgType: 'init-non-streaming-asr', context });
 
     this.workerInstance.postMessage({ msgType: 'init-vad-mic', context });
+  }
 
-    this.initMicrophone();
+  async test2() {
+    let sandboxPath: string = getContext().getApplicationContext().filesDir;
+    await fs.mkdir(sandboxPath + "/" + "test");
+  }
+
+  mkdir(parts: string[]) {
+    console.log(`making dirs: ${parts}`);
+    const path = parts.join('/');
+    if (fs.accessSync(path)) {
+      console.log(`${path} exists, skip creating it`);
+      return;
+    }
+
+    const sandboxPath: string = getContext().getApplicationContext().filesDir;
+    let d = sandboxPath
+    for (const p of parts) {
+      d = d + '/' + p;
+
+      if (fs.accessSync(d)) {
+        console.log(`dir: ${d} exists, skip creating it`);
+        continue;
+      }
+
+      fs.mkdirSync(d);
+      console.log(`created dir: ${d}`);
+    }
+  }
+
+  copyRawFileDirToSandbox(srcDir: string) {
+    let mgr = getContext().resourceManager;
+    const allFiles = listRawfileDir(mgr, srcDir);
+    for (const src of allFiles) {
+      console.log(src);
+
+      const parts: string[] = src.split('/');
+      if (parts.length != 1) {
+        this.mkdir(parts.slice(0, -1));
+      }
+
+      this.copyRawFileToSandbox(src, src);
+    }
   }
 
   copyRawFileToSandbox(src: string, dst: string) {
+    console.log(`copying ${src} to ${dst}`);
+
     // see https://blog.csdn.net/weixin_44640245/article/details/142634846
     // https://developer.huawei.com/consumer/cn/doc/harmonyos-guides-V5/rawfile-guidelines-V5
     let uint8Array: Uint8Array = getContext().resourceManager.getRawFileContentSync(src);
-    console.log(`number of bytes: ${uint8Array.length}`);
 
+    // https://developer.huawei.com/consumer/cn/doc/harmonyos-references-V5/js-apis-file-fs-V5#fsmkdir
     let sandboxPath: string = getContext().getApplicationContext().filesDir;
     let filepath = sandboxPath + `/${dst}`;
-    const fp = fileIo.openSync(filepath, fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
-    let n = fileIo.writeSync(fp.fd, buffer.from(uint8Array).buffer)
-    fileIo.close(fp.fd);
+
+    if (fs.accessSync(filepath)) {
+      let stat = fs.statSync(filepath);
+      if (stat.size == uint8Array.length) {
+        console.log(`dst ${dst} exists, skip copying`);
+        return;
+      }
+    }
+
+    console.log(`number of bytes: ${uint8Array.length}`);
+
+    const fp = fs.openSync(filepath, fs.OpenMode.WRITE_ONLY | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
+    let n = fs.writeSync(fp.fd, buffer.from(uint8Array).buffer)
+    fs.close(fp.fd);
     console.log(`wrote ${n} bytes to ${filepath}`);
   }
 
@@ -262,6 +285,11 @@ struct Index {
               .fontSize(50)
               .fontWeight(FontWeight.Bold)
               .onClick(() => {
+                console.log('clicked');
+                let mgr = getContext().resourceManager;
+                let a = listRawfileDir(mgr, "");
+                console.log(`${a.join('\n')}`);
+                this.copyRawFileDirToSandbox('');
 
                 // this.copyRawFileToSandbox('0.wav', '0.wav');
                 // this.copyRawFileToSandbox('en.wav', 'en.wav');
