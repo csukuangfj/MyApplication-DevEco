@@ -1,5 +1,7 @@
 export const add: (a: number, b: number) => number;
 
+export const listRawfileDir: (mgr: object, dir: string) => Array<string>;
+
 export const readWave: (filename: string, enableExternalBuffer: boolean = true) => {samples: Float32Array, sampleRate: number};
 export const readWaveFromBinary: (data: Uint8Array, enableExternalBuffer: boolean = true) => {samples: Float32Array, sampleRate: number};
 export const readRawFile: (mgr: object, filename: string) => void;

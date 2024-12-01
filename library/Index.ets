@@ -32,7 +32,7 @@ import {
   voiceActivityDetectorReset,
 } from "liblibrary.so";
 export { MainPage } from './src/main/ets/components/MainPage';
-export {add, readWave, readRawFile, readWaveFromBinary} from "liblibrary.so";
+export {add, readWave, readRawFile, readWaveFromBinary, listRawfileDir} from "liblibrary.so";
 
 
 export class SileroVadConfig {
